@@ -45,31 +45,41 @@ class FileParser {
       throw FormatException('No headers found in: $fileName');
     }
 
+    // Identify numeric columns by scanning all data rows
+    final numericColumns = _detectNumericColumns(
+      headers,
+      rows.sublist(headerIndex + 1),
+    );
+
+    if (numericColumns.isEmpty) {
+      throw FormatException(
+          'No numeric columns found in: $fileName');
+    }
+
     final dataRows = <DataRow>[];
     for (var i = headerIndex + 1; i < rows.length; i++) {
       final row = rows[i];
       if (row.length != headers.length) continue;
 
       final values = <String, double>{};
-      bool validRow = true;
+      bool hasData = false;
 
-      for (var j = 0; j < headers.length; j++) {
-        final parsed = _tryParseDouble(row[j]);
-        if (parsed != null) {
-          values[headers[j]] = parsed;
-        } else {
-          validRow = false;
-          break;
+      for (final col in numericColumns) {
+        final colIndex = headers.indexOf(col);
+        final parsed = _tryParseDouble(row[colIndex]);
+        if (parsed != null && !parsed.isNaN) {
+          values[col] = parsed;
+          hasData = true;
         }
       }
 
-      if (validRow && values.isNotEmpty) {
+      if (hasData) {
         dataRows.add(DataRow(values: values));
       }
     }
 
     return Dataset(
-      columns: headers,
+      columns: numericColumns,
       rows: dataRows,
       sourceName: fileName,
     );
@@ -129,35 +139,68 @@ class FileParser {
       throw FormatException('No headers found in: $fileName');
     }
 
-    final dataRows = <DataRow>[];
+    // Build raw data for numeric column detection
+    final rawData = <List<dynamic>>[];
     for (var i = 1; i < sheetRows.length; i++) {
       final row = sheetRows[i];
       if (row.length < headers.length) continue;
+      rawData.add(
+          List.generate(headers.length, (j) => row[j]?.value));
+    }
 
+    final numericColumns = _detectNumericColumns(headers, rawData);
+
+    if (numericColumns.isEmpty) {
+      throw FormatException(
+          'No numeric columns found in: $fileName');
+    }
+
+    final dataRows = <DataRow>[];
+    for (final rawRow in rawData) {
       final values = <String, double>{};
-      bool validRow = true;
+      bool hasData = false;
 
-      for (var j = 0; j < headers.length; j++) {
-        final cellValue = row[j]?.value;
-        final parsed = _tryParseDouble(cellValue);
-        if (parsed != null) {
-          values[headers[j]] = parsed;
-        } else {
-          validRow = false;
-          break;
+      for (final col in numericColumns) {
+        final colIndex = headers.indexOf(col);
+        final parsed = _tryParseDouble(rawRow[colIndex]);
+        if (parsed != null && !parsed.isNaN) {
+          values[col] = parsed;
+          hasData = true;
         }
       }
 
-      if (validRow && values.isNotEmpty) {
+      if (hasData) {
         dataRows.add(DataRow(values: values));
       }
     }
 
     return Dataset(
-      columns: headers,
+      columns: numericColumns,
       rows: dataRows,
       sourceName: fileName,
     );
+  }
+
+  /// Scans all data rows to find columns where at least half the values
+  /// are parseable as doubles. Returns the list of numeric column names.
+  static List<String> _detectNumericColumns(
+      List<String> headers, List<List<dynamic>> dataRows) {
+    if (dataRows.isEmpty) return [];
+
+    final numericColumns = <String>[];
+    for (var j = 0; j < headers.length; j++) {
+      int numericCount = 0;
+      for (final row in dataRows) {
+        if (j < row.length && _tryParseDouble(row[j]) != null) {
+          numericCount++;
+        }
+      }
+      // A column is numeric if at least half its values parse as numbers
+      if (numericCount > dataRows.length / 2) {
+        numericColumns.add(headers[j]);
+      }
+    }
+    return numericColumns;
   }
 
   static double? _tryParseDouble(dynamic value) {

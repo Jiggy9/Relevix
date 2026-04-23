@@ -66,18 +66,23 @@ class _UploadScreenState extends State<UploadScreen> {
           final validation = DataValidator.validate(dataset);
 
           if (_files.length > 1) {
-            final schemaCheck = DataValidator.validateSchemaMatch(
-              _files.firstWhere((f) => f.isValid).dataset!,
-              dataset,
-            );
-            if (!schemaCheck.isValid) {
-              setState(() {
-                _files[index] = _FileEntry(
-                  name: file.name,
-                  error: schemaCheck.error,
-                );
-              });
-              continue;
+            final firstValid = _files
+                .where((f) => f.isValid && f != _files[index])
+                .firstOrNull;
+            if (firstValid != null) {
+              final schemaCheck = DataValidator.validateSchemaMatch(
+                firstValid.dataset!,
+                dataset,
+              );
+              if (!schemaCheck.isValid) {
+                setState(() {
+                  _files[index] = _FileEntry(
+                    name: file.name,
+                    error: schemaCheck.error,
+                  );
+                });
+                continue;
+              }
             }
           }
 

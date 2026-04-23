@@ -132,7 +132,9 @@ class _MainScreenState extends State<MainScreen> {
             child: ChartWidget(
               dataset: widget.dataset,
               xColumn: _currentInputColumn,
-              yColumn: _currentOutputColumn,
+              yColumns: widget.dataset.columns
+                  .where((c) => c != _currentInputColumn)
+                  .toList(),
             ),
           ),
         ),
@@ -157,7 +159,9 @@ class _MainScreenState extends State<MainScreen> {
             child: ChartWidget(
               dataset: widget.dataset,
               xColumn: _currentInputColumn,
-              yColumn: _currentOutputColumn,
+              yColumns: widget.dataset.columns
+                  .where((c) => c != _currentInputColumn)
+                  .toList(),
             ),
           ),
         ),
